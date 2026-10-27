@@ -1,0 +1,69 @@
+service: pathwise-api
+frameworkVersion: '3'
+
+plugins:
+  - serverless-esbuild
+
+custom:
+  ssm: /pathwise/${sls:stage}
+  esbuild:
+    bundle: true
+    minify: false
+    sourcemap: true
+    target: node22
+    platform: node
+    loader:
+      .pem: text
+    # Knex can load drivers for many databases; only pg is used. `exclude` leaves the rest out of the bundle and the
+    # package (`external` would try to install them). List from: grep require knex/lib/dialects.
+    exclude:
+      - better-sqlite3
+      - mariadb
+      - mysql
+      - mysql2
+      - oracledb
+      - pg-native
+      - pg-query-stream
+      - sqlite3
+      - tedious
+
+provider:
+  name: aws
+  # Serverless v3 doesn't list nodejs22.x yet and only warns; Lambda deprecated nodejs20.x.
+  runtime: nodejs22.x
+  architecture: arm64
+  region: ap-south-1
+  stage: ${opt:stage, 'dev'}
+  memorySize: 256
+  timeout: 10
+  logRetentionInDays: 7
+  vpc:
+    securityGroupIds:
+      - ${ssm:${self:custom.ssm}/lambda/security-group-id}
+    subnetIds: ${ssm:${self:custom.ssm}/vpc/subnet-ids}
+  environment:
+    NODE_OPTIONS: --enable-source-maps
+    DB_HOST: ${ssm:${self:custom.ssm}/db/host}
+    DB_NAME: ${ssm:${self:custom.ssm}/db/name}
+    DB_USER: ${ssm:${self:custom.ssm}/db/user}
+    DB_PASSWORD: ${ssm:${self:custom.ssm}/db/password}
+  httpApi:
+    cors: true
+
+functions:
+  health:
+    handler: src/health/handler.health
+    events:
+      - httpApi: GET /health
+  listJobs:
+    handler: src/jobs/handlers.listJobs
+    events:
+      - httpApi: GET /jobs
+  listJobMapPins:
+    handler: src/jobs/handlers.listJobMapPins
+    events:
+      - httpApi: GET /jobs/map
+  listJobFilterOptions:
+    handler: src/jobs/handlers.listJobFilterOptions
+    events:
+      - httpApi: GET /jobs/filters

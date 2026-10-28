@@ -46,10 +46,11 @@ describe('listJobs', () => {
 describe('listJobFilterOptions', () => {
   afterEach(() => jest.restoreAllMocks());
 
-  it('returns skills and companies', async () => {
-    jest.mocked(jobsRepository.listJobFilterOptions).mockResolvedValue({ skills: [], companies: [] });
+  it('returns cities, titles, skills and companies', async () => {
+    const options = { cities: [], titles: [], skills: [], companies: [] };
+    jest.mocked(jobsRepository.listJobFilterOptions).mockResolvedValue(options);
 
-    expect(bodyOf(await listJobFilterOptions(event()))).toEqual({ skills: [], companies: [] });
+    expect(bodyOf(await listJobFilterOptions(event()))).toEqual(options);
   });
 
   it('hides database errors behind a 500', async () => {

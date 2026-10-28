@@ -16,6 +16,7 @@ const commaList = (item: z.ZodTypeAny, max: number) =>
 const filterFields = {
   verified: booleanFlag.optional(),
   last24Hours: booleanFlag.optional(),
+  lastWeek: booleanFlag.optional(),
   lat: z.coerce.number().min(-90).max(90).optional(),
   lng: z.coerce.number().min(-180).max(180).optional(),
   radiusKm: z.coerce.number().positive().max(200).default(25),
@@ -25,6 +26,8 @@ const filterFields = {
   skills: commaList(z.string().regex(/^[a-z0-9-]+$/), 10).optional(),
   companies: commaList(z.string().uuid(), 20).optional(),
   city: z.string().trim().min(1).max(100).optional(),
+  cities: commaList(z.string().min(1).max(100), 20).optional(),
+  titles: commaList(z.string().min(1).max(200), 20).optional(),
   experience: z.coerce.number().int().min(0).max(50).optional(),
 };
 

@@ -52,7 +52,19 @@ export interface CompanyOption extends Omit<CompanySummary, 'logo_url'> {
   job_count: number;
 }
 
+export interface CityOption {
+  city: string;
+  job_count: number;
+}
+
+export interface TitleOption {
+  job_title: string;
+  job_count: number;
+}
+
 export interface JobFilterOptions {
+  cities: CityOption[];
+  titles: TitleOption[];
   skills: SkillOption[];
   companies: CompanyOption[];
 }

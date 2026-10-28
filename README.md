@@ -73,6 +73,7 @@ Public (guests can browse). Every filter is optional and they combine.
 |---|---|---|
 | `verified` | `true` | Only companies marked verified |
 | `last24Hours` | `true` | Posted in the last 24 hours |
+| `lastWeek` | `true` | Posted in the last 7 days |
 | `age` | `0-3`, `3-7`, `7-15`, `15-30`, `30+` | Days since posted |
 | `lat`, `lng`, `radiusKm` | `13.34`, `74.74`, `25` | Within the radius (default 25 km, max 200); results sorted nearest first with `distance_km` |
 | `q` | `react` | The app's search box: title (substring or typo), company, city or skill name |
@@ -80,6 +81,8 @@ Public (guests can browse). Every filter is optional and they combine.
 | `skills` | `react,python` | Has any of these skill slugs (max 10) |
 | `companies` | `<uuid>,<uuid>` | From these companies (max 20) |
 | `city` | `Udupi` | Exact city (used by the map's company sheet) |
+| `cities` | `Bengaluru,Pune` | In any of these exact cities (max 20) |
+| `titles` | `Frontend Developer,QA Engineer` | Any of these exact titles (max 20) |
 | `experience` | `3` | Jobs whose experience range includes this many years |
 | `sort` | `newest`, `oldest`, `salary`, `nearest` | Order. Default `newest`, or `nearest` when `lat`/`lng` are given; `nearest` needs them; `salary` puts undisclosed salaries last |
 | `page`, `pageSize` | `1`, `20` | Paging; `pageSize` max 50 |
@@ -112,7 +115,7 @@ Tapping a pin in the app lists that company's jobs with `/jobs?companies=<compan
 
 ### `GET /jobs/filters`
 
-Skills and companies that have open jobs, with counts, for the filter chips: `{ "skills": [{ skill_id, skill_name, slug, job_count }], "companies": [{ company_id, company_name, is_verified, job_count }] }`.
+Cities, titles, skills and companies that have open jobs, with counts, for the app's filter sheet: `{ "cities": [{ city, job_count }], "titles": [{ job_title, job_count }], "skills": [{ skill_id, skill_name, slug, job_count }], "companies": [{ company_id, company_name, is_verified, job_count }] }`. Each list holds the 200 with most jobs; the app searches within them.
 
 ### Profile and resume (signed in)
 

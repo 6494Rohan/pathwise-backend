@@ -1,6 +1,15 @@
 import type { Knex } from 'knex';
 import type { AgeBucket, JobFilters, JobListQuery } from './jobFilters';
-import type { CompanyOption, JobFilterOptions, JobListItem, JobMapPin, JobPage, SkillOption } from './jobs.types';
+import type {
+  CityOption,
+  CompanyOption,
+  JobFilterOptions,
+  JobListItem,
+  JobMapPin,
+  JobPage,
+  SkillOption,
+  TitleOption,
+} from './jobs.types';
 
 // [newer, older] bound in days since posting; null = open-ended.
 const AGE_RANGES: Record<AgeBucket, [number | null, number | null]> = {
@@ -12,6 +21,9 @@ const AGE_RANGES: Record<AgeBucket, [number | null, number | null]> = {
 };
 
 type JobRow = JobListItem & { total_count: string };
+
+// The app searches within these, so the most common values are enough.
+const MAX_FILTER_OPTIONS = 200;
 
 const escapeLike = (value: string) => value.replace(/[\\%_]/g, (char) => `\\${char}`);
 
@@ -26,6 +38,7 @@ const byVerifiedCompany = (query: Knex.QueryBuilder, filters: JobFilters) => {
 
 const byPostedAge = (query: Knex.QueryBuilder, filters: JobFilters) => {
   if (filters.last24Hours) query.whereRaw("j.posted_at >= now() - interval '24 hours'");
+  if (filters.lastWeek) query.whereRaw("j.posted_at >= now() - interval '7 days'");
   if (!filters.age) return;
   const [newer, older] = AGE_RANGES[filters.age];
   if (newer !== null) query.whereRaw('j.posted_at <= now() - make_interval(days => ?)', [newer]);
@@ -83,6 +96,14 @@ const byCity = (query: Knex.QueryBuilder, filters: JobFilters) => {
   if (filters.city) query.where('j.city', filters.city);
 };
 
+const byCities = (query: Knex.QueryBuilder, filters: JobFilters) => {
+  if (filters.cities) query.whereIn('j.city', filters.cities);
+};
+
+const byTitles = (query: Knex.QueryBuilder, filters: JobFilters) => {
+  if (filters.titles) query.whereIn('j.title', filters.titles);
+};
+
 const byExperience = (query: Knex.QueryBuilder, filters: JobFilters) => {
   const years = filters.experience;
   if (years === undefined) return;
@@ -104,6 +125,8 @@ const filteredJobs = (db: Knex, filters: JobFilters, point: Knex.Raw | null) =>
     .modify(bySkills(db), filters)
     .modify(byCompanies, filters)
     .modify(byCity, filters)
+    .modify(byCities, filters)
+    .modify(byTitles, filters)
     .modify(byExperience, filters);
 
 export const buildListJobsQuery = (db: Knex, filters: JobListQuery) => {
@@ -188,20 +211,33 @@ export const listJobMapPins = async (db: Knex, filters: JobFilters): Promise<Job
   buildJobMapPinsQuery(db, filters);
 
 export const listJobFilterOptions = async (db: Knex): Promise<JobFilterOptions> => {
-  const [skills, companies] = await Promise.all([
+  const openJobs = () => db('jobs as j').where('j.status', 'open');
+  const [cities, titles, skills, companies] = await Promise.all([
+    openJobs()
+      .select('j.city', db.raw('count(*)::int AS job_count'))
+      .groupBy('j.city')
+      .orderBy([{ column: 'job_count', order: 'desc' }, 'j.city'])
+      .limit(MAX_FILTER_OPTIONS) as Promise<CityOption[]>,
+    openJobs()
+      .select('j.title as job_title', db.raw('count(*)::int AS job_count'))
+      .groupBy('j.title')
+      .orderBy([{ column: 'job_count', order: 'desc' }, 'j.title'])
+      .limit(MAX_FILTER_OPTIONS) as Promise<TitleOption[]>,
     db('skills as s')
       .select('s.id as skill_id', 's.name as skill_name', 's.slug', db.raw('count(*)::int AS job_count'))
       .join('job_skills as js', 'js.skill_id', 's.id')
       .join('jobs as j', 'j.id', 'js.job_id')
       .where('j.status', 'open')
       .groupBy('s.id')
-      .orderBy([{ column: 'job_count', order: 'desc' }, 's.name']) as Promise<SkillOption[]>,
+      .orderBy([{ column: 'job_count', order: 'desc' }, 's.name'])
+      .limit(MAX_FILTER_OPTIONS) as Promise<SkillOption[]>,
     db('companies as c')
       .select('c.id as company_id', 'c.name as company_name', 'c.is_verified', db.raw('count(*)::int AS job_count'))
       .join('jobs as j', 'j.company_id', 'c.id')
       .where('j.status', 'open')
       .groupBy('c.id')
-      .orderBy([{ column: 'job_count', order: 'desc' }, 'c.name']) as Promise<CompanyOption[]>,
+      .orderBy([{ column: 'job_count', order: 'desc' }, 'c.name'])
+      .limit(MAX_FILTER_OPTIONS) as Promise<CompanyOption[]>,
   ]);
-  return { skills, companies };
+  return { cities, titles, skills, companies };
 };

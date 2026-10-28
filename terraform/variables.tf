@@ -32,3 +32,21 @@ variable "db_allocated_storage_gb" {
   type    = number
   default = 20
 }
+
+
+variable "budget_alert_email" {
+  description = "Where AWS Budgets sends cost warnings; empty skips the budget."
+  type        = string
+  default     = ""
+}
+
+variable "monthly_budget_usd" {
+  type    = string
+  default = "5"
+}
+
+variable "amplify_outputs_path" {
+  description = "amplify_outputs.json written by `npm run sandbox`; the API's JWT authorizer trusts its user pool."
+  type        = string
+  default     = "../../pathwise/amplify_outputs.json"
+}

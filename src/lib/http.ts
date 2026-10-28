@@ -8,6 +8,17 @@ export const json = (statusCode: number, body: unknown): APIGatewayProxyStructur
   body: JSON.stringify(body),
 });
 
+export const failure = (statusCode: number, error: string, message: string) => json(statusCode, { error, message });
+
 export const badRequest = (message: string, issues?: unknown) => json(400, { error: 'bad_request', message, issues });
 
-export const serverError = () => json(500, { error: 'internal_error', message: 'Something went wrong.' });
+export const serverError = () => failure(500, 'internal_error', 'Something went wrong.');
+
+export const parseJsonBody = (body: string | undefined, isBase64Encoded = false): unknown => {
+  if (!body) return {};
+  try {
+    return JSON.parse(isBase64Encoded ? Buffer.from(body, 'base64').toString('utf8') : body);
+  } catch {
+    return undefined;
+  }
+};

@@ -4,8 +4,28 @@ frameworkVersion: '3'
 plugins:
   - serverless-esbuild
 
+# Daily AI resume-parse caps (per user, and across all users); dev is high so testing isn't blocked.
+params:
+  default:
+    resumeParsesPerUser: 3
+    resumeParsesTotal: 100
+  dev:
+    resumeParsesPerUser: 1000
+    resumeParsesTotal: 10000
+
 custom:
   ssm: /pathwise/${sls:stage}
+  resumesBucket: ${ssm:${self:custom.ssm}/resumes/bucket}
+  # Functions that use the database run in the VPC. It has no NAT, so functions that call S3 or Gemini stay outside.
+  vpc:
+    securityGroupIds:
+      - ${ssm:${self:custom.ssm}/lambda/security-group-id}
+    subnetIds: ${ssm:${self:custom.ssm}/vpc/subnet-ids}
+  dbEnvironment:
+    DB_HOST: ${ssm:${self:custom.ssm}/db/host}
+    DB_NAME: ${ssm:${self:custom.ssm}/db/name}
+    DB_USER: ${ssm:${self:custom.ssm}/db/user}
+    DB_PASSWORD: ${ssm:${self:custom.ssm}/db/password}
   esbuild:
     bundle: true
     minify: false
@@ -37,33 +57,103 @@ provider:
   memorySize: 256
   timeout: 10
   logRetentionInDays: 7
-  vpc:
-    securityGroupIds:
-      - ${ssm:${self:custom.ssm}/lambda/security-group-id}
-    subnetIds: ${ssm:${self:custom.ssm}/vpc/subnet-ids}
   environment:
     NODE_OPTIONS: --enable-source-maps
-    DB_HOST: ${ssm:${self:custom.ssm}/db/host}
-    DB_NAME: ${ssm:${self:custom.ssm}/db/name}
-    DB_USER: ${ssm:${self:custom.ssm}/db/user}
-    DB_PASSWORD: ${ssm:${self:custom.ssm}/db/password}
+    RESUMES_BUCKET: ${self:custom.resumesBucket}
   httpApi:
     cors: true
+    authorizers:
+      cognito:
+        type: jwt
+        identitySource: $request.header.Authorization
+        issuerUrl: https://cognito-idp.${aws:region}.amazonaws.com/${ssm:${self:custom.ssm}/cognito/user-pool-id}
+        audience:
+          - ${ssm:${self:custom.ssm}/cognito/client-id}
+  # Serverless v3 gives all functions one role; each statement is scoped to the one resource it needs.
+  iam:
+    role:
+      statements:
+        - Effect: Allow
+          Action:
+            - s3:GetObject
+            - s3:PutObject
+            - s3:DeleteObject
+          Resource: arn:aws:s3:::${self:custom.resumesBucket}/resumes/*
+        - Effect: Allow
+          Action: lambda:InvokeFunction
+          Resource: arn:aws:lambda:${aws:region}:${aws:accountId}:function:${self:service}-${sls:stage}-resumeStore
 
 functions:
   health:
     handler: src/health/handler.health
+    vpc: ${self:custom.vpc}
+    environment: ${self:custom.dbEnvironment}
     events:
       - httpApi: GET /health
   listJobs:
     handler: src/jobs/handlers.listJobs
+    vpc: ${self:custom.vpc}
+    environment: ${self:custom.dbEnvironment}
     events:
       - httpApi: GET /jobs
   listJobMapPins:
     handler: src/jobs/handlers.listJobMapPins
+    vpc: ${self:custom.vpc}
+    environment: ${self:custom.dbEnvironment}
     events:
       - httpApi: GET /jobs/map
   listJobFilterOptions:
     handler: src/jobs/handlers.listJobFilterOptions
+    vpc: ${self:custom.vpc}
+    environment: ${self:custom.dbEnvironment}
     events:
       - httpApi: GET /jobs/filters
+  getProfile:
+    handler: src/profile/profileHandlers.getProfile
+    vpc: ${self:custom.vpc}
+    environment: ${self:custom.dbEnvironment}
+    events:
+      - httpApi:
+          method: GET
+          path: /profile
+          authorizer: cognito
+  getResumeDownloadUrl:
+    handler: src/profile/profileHandlers.getResumeDownloadUrl
+    vpc: ${self:custom.vpc}
+    environment: ${self:custom.dbEnvironment}
+    events:
+      - httpApi:
+          method: GET
+          path: /profile/resume/download-url
+          authorizer: cognito
+  resumeStore:
+    handler: src/profile/profileHandlers.resumeStore
+    vpc: ${self:custom.vpc}
+    environment:
+      DB_HOST: ${self:custom.dbEnvironment.DB_HOST}
+      DB_NAME: ${self:custom.dbEnvironment.DB_NAME}
+      DB_USER: ${self:custom.dbEnvironment.DB_USER}
+      DB_PASSWORD: ${self:custom.dbEnvironment.DB_PASSWORD}
+      RESUME_PARSES_PER_USER: ${param:resumeParsesPerUser}
+      RESUME_PARSES_TOTAL: ${param:resumeParsesTotal}
+  createResumeUploadUrl:
+    handler: src/profile/resumeHandlers.createResumeUploadUrl
+    events:
+      - httpApi:
+          method: POST
+          path: /profile/resume/upload-url
+          authorizer: cognito
+  parseResume:
+    handler: src/profile/resumeHandlers.parseResume
+    # API Gateway's HTTP API allows 30 s; the PDF is held in memory as base64.
+    timeout: 29
+    memorySize: 512
+    environment:
+      # SecureString, decrypted at deploy time; only this function gets it.
+      GEMINI_API_KEY: ${ssm:${self:custom.ssm}/gemini/api-key}
+      RESUME_STORE_FUNCTION: ${self:service}-${sls:stage}-resumeStore
+    events:
+      - httpApi:
+          method: POST
+          path: /profile/resume/parse
+          authorizer: cognito

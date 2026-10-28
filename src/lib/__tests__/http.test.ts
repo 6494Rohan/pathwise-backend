@@ -1,4 +1,4 @@
-import { badRequest, json, serverError } from '../http';
+import { badRequest, failure, json, parseJsonBody, serverError } from '../http';
 
 describe('http responses', () => {
   it('serialises JSON with a content type', () => {
@@ -16,5 +16,16 @@ describe('http responses', () => {
       issues: [{ path: ['age'] }],
     });
     expect(serverError()).toEqual(expect.objectContaining({ statusCode: 500 }));
+  });
+
+  it('builds errors with a code', () => {
+    expect(JSON.parse(failure(429, 'parse_limit', 'Try tomorrow.').body as string)).toEqual({ error: 'parse_limit', message: 'Try tomorrow.' });
+  });
+
+  it('parses JSON bodies, including base64-encoded ones, and returns undefined for bad JSON', () => {
+    expect(parseJsonBody('{"a":1}')).toEqual({ a: 1 });
+    expect(parseJsonBody(Buffer.from('{"a":1}').toString('base64'), true)).toEqual({ a: 1 });
+    expect(parseJsonBody(undefined)).toEqual({});
+    expect(parseJsonBody('{')).toBeUndefined();
   });
 });

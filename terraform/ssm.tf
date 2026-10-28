@@ -1,6 +1,7 @@
 # The Serverless API reads these at deploy time (serverless.yml → ${ssm:...}).
 locals {
-  ssm_prefix = "/${var.project}/${var.stage}"
+  ssm_prefix   = "/${var.project}/${var.stage}"
+  amplify_auth = jsondecode(file("${path.module}/${var.amplify_outputs_path}")).auth
 }
 
 resource "aws_ssm_parameter" "db_host" {
@@ -37,4 +38,22 @@ resource "aws_ssm_parameter" "subnet_ids" {
   name  = "${local.ssm_prefix}/vpc/subnet-ids"
   type  = "StringList"
   value = join(",", aws_subnet.public[*].id)
+}
+
+resource "aws_ssm_parameter" "resumes_bucket" {
+  name  = "${local.ssm_prefix}/resumes/bucket"
+  type  = "String"
+  value = aws_s3_bucket.resumes.bucket
+}
+
+resource "aws_ssm_parameter" "cognito_user_pool_id" {
+  name  = "${local.ssm_prefix}/cognito/user-pool-id"
+  type  = "String"
+  value = local.amplify_auth.user_pool_id
+}
+
+resource "aws_ssm_parameter" "cognito_client_id" {
+  name  = "${local.ssm_prefix}/cognito/client-id"
+  type  = "String"
+  value = local.amplify_auth.user_pool_client_id
 }

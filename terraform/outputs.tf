@@ -14,3 +14,7 @@ output "db_password_ssm_parameter" {
   description = "Read with: aws ssm get-parameter --with-decryption --name <this>"
   value       = aws_ssm_parameter.db_password.name
 }
+
+output "resumes_bucket" {
+  value = aws_s3_bucket.resumes.bucket
+}

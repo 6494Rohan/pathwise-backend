@@ -18,7 +18,7 @@ resource "aws_db_parameter_group" "main" {
   }
 }
 
-# Demo sizing: smallest instance, single AZ, 1-day backups, no final snapshot. Raise these before real users arrive.
+# Dev sizing: smallest instance, single AZ, 1-day backups, no final snapshot. Raise these before real users arrive.
 resource "aws_db_instance" "main" {
   identifier     = local.name
   engine         = "postgres"

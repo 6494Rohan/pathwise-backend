@@ -141,7 +141,7 @@ npm test                   # Jest: API and Amplify Lambda tests (no AWS, no data
 npm run typecheck          # API and Amplify TypeScript
 npx serverless invoke local -f listJobs --data '{"queryStringParameters":{"verified":"true","pageSize":"3"}}'
                            # runs a function on your machine against the dev RDS (reads SSM; creates nothing)
-npm run deploy:api         # deploys the API (Lambda + API Gateway) — pay-per-request, ~free at demo traffic
+npm run deploy:api         # deploys the API (Lambda + API Gateway) — pay-per-request, ~free at low traffic
 ```
 
 ## Decisions
@@ -155,7 +155,7 @@ npm run deploy:api         # deploys the API (Lambda + API Gateway) — pay-per-
   - an optional AWS Budgets email alert (`budget_alert_email`)
 - **Why not Claude on Bedrock:** this account's Bedrock quota for Claude Haiku is 0 tokens per minute (new-account default), and the Mantle endpoint doesn't serve Haiku 5.5 in `ap-south-1`.
 - **The resume is untrusted input.** The system instruction says to ignore instructions inside it; the reply is requested in a JSON schema and validated with zod before anything is saved. Resume contents are never logged; only token counts are.
-- **Database settings come from SSM at deploy time** (`serverless.yml` → `${ssm:…}`), written there by Terraform. The password is a SecureString; it ends up in the Lambda's environment, which is acceptable for a demo; read it at runtime instead before production.
+- **Database settings come from SSM at deploy time** (`serverless.yml` → `${ssm:…}`), written there by Terraform. The password is a SecureString; it ends up in the Lambda's environment, which is acceptable for dev; read it at runtime instead before production.
 - **RDS certificates are verified** with the official bundle in `src/lib/certs/` (`rejectUnauthorized: true`), and RDS itself refuses non-TLS connections.
 - **Knex for queries:** composable filters and bound parameters; raw SQL only for PostGIS and pg_trgm, always with bindings.
 - **Serverless v3** (v4 requires a Serverless account login). It doesn't know `nodejs22.x` yet and only warns; Node 20 is deprecated on Lambda.

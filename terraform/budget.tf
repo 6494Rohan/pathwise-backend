@@ -1,4 +1,4 @@
-# Emails a warning before the demo costs more than expected. Created only when budget_alert_email is set.
+# Emails a warning before the dev environment costs more than expected. Created only when budget_alert_email is set.
 resource "aws_budgets_budget" "monthly" {
   count = var.budget_alert_email == "" ? 0 : 1
 
